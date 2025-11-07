@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8B8E7062-6E01-88A3-3562-49F008CA94FA}</ProjectGuid>
+    <RootNamespace>CudaRuntime1</RootNamespace>
+    <ProjectName>CudaHomeWork01</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 13.0.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>E:\freeglut\include;D:\cuda\cuda-samples-master\Samples;D:\OpenCV\opencv\build\include;D:\cuda\cuda-samples-master\Common;$(IncludePath)</IncludePath>
+    <LibraryPath>E:\freeglut\lib;D:\cuda\CUDA 13\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\cuda\cuda-samples-master\Samples;D:\OpenCV\opencv\build\include;D:\cuda\cuda-samples-master\Common;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\cuda\CUDA 13\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>E:\freeglut\include;D:\cuda\cuda-samples-master\Samples;D:\OpenCV\opencv\build\include;D:\cuda\cuda-samples-master\Common;$(IncludePath)</IncludePath>
+    <LibraryPath>E:\freeglut\lib;D:\cuda\CUDA 13\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>D:\cuda\cuda-samples-master\Samples;D:\OpenCV\opencv\build\include;D:\cuda\cuda-samples-master\Common;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\cuda\CUDA 13\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glut64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\freeglut\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;D:\cuda\CUDA 13\lib;D:\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glut64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;D:\cuda\CUDA 13\lib;D:\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glut64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\freeglut\lib;E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;D:\cuda\CUDA 13\lib;D:\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glut64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\lib;D:\cuda\CUDA 13\lib;D:\OpenCV\opencv\build\x64\vc16\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CudaCompile Include="kernel.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="inc\aabb.h" />
+    <ClInclude Include="inc\box.h" />
+    <ClInclude Include="inc\exception.h" />
+    <ClInclude Include="inc\forceline.h" />
+    <ClInclude Include="inc\GLFW\glfw3.h" />
+    <ClInclude Include="inc\GLFW\glfw3native.h" />
+    <ClInclude Include="inc\GL\glew.h" />
+    <ClInclude Include="inc\GL\glext.h" />
+    <ClInclude Include="inc\GL\glh_convenience.h" />
+    <ClInclude Include="inc\GL\glh_genext.h" />
+    <ClInclude Include="inc\GL\glh_glut.h" />
+    <ClInclude Include="inc\GL\glh_linear.h" />
+    <ClInclude Include="inc\GL\glut.h" />
+    <ClInclude Include="inc\GL\glxew.h" />
+    <ClInclude Include="inc\GL\wglew.h" />
+    <ClInclude Include="inc\GL\wglext.h" />
+    <ClInclude Include="inc\helper_cuda.h" />
+    <ClInclude Include="inc\helper_functions.h" />
+    <ClInclude Include="inc\helper_image.h" />
+    <ClInclude Include="inc\helper_math.h" />
+    <ClInclude Include="inc\helper_string.h" />
+    <ClInclude Include="inc\helper_timer.h" />
+    <ClInclude Include="inc\IMGUI\imconfig.h" />
+    <ClInclude Include="inc\IMGUI\imgui.h" />
+    <ClInclude Include="inc\IMGUI\imgui_impl_opengl3.h" />
+    <ClInclude Include="inc\IMGUI\imgui_impl_opengl3_loader.h" />
+    <ClInclude Include="inc\IMGUI\imgui_internal.h" />
+    <ClInclude Include="inc\IMGUI\imstb_rectpack.h" />
+    <ClInclude Include="inc\IMGUI\imstb_textedit.h" />
+    <ClInclude Include="inc\IMGUI\imstb_truetype.h" />
+    <ClInclude Include="inc\mat3f.h" />
+    <ClInclude Include="inc\pair.h" />
+    <ClInclude Include="inc\quaternion.h" />
+    <ClInclude Include="inc\real.h" />
+    <ClInclude Include="inc\transf.h" />
+    <ClInclude Include="inc\tri.h" />
+    <ClInclude Include="inc\vec3f.h" />
+    <ClInclude Include="src\crigid.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="inc\IMGUI\imgui.cpp" />
+    <ClCompile Include="inc\IMGUI\imgui_demo.cpp" />
+    <ClCompile Include="inc\IMGUI\imgui_draw.cpp" />
+    <ClCompile Include="inc\IMGUI\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="inc\IMGUI\imgui_tables.cpp" />
+    <ClCompile Include="inc\IMGUI\imgui_widgets.cpp" />
+    <ClCompile Include="src\cmodel.cpp" />
+    <ClCompile Include="src\crigid.cpp" />
+    <ClCompile Include="src\obj-viewer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="lib\glfw3.lib" />
+    <Library Include="lib\glfw3_mt.lib" />
+    <Library Include="lib\glut32.lib" />
+    <Library Include="lib\glut64.lib" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 13.0.targets" />
+  </ImportGroup>
+</Project>
