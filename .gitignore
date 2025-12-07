@@ -1,3 +1,52 @@
 CudaRuntime1/Debug/
 CudaRuntime1/CudaHomeWork01/.
 CudaRuntime1/.vs/
+
+!CudaRuntime1/data/
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build folders
+**/Debug/
+**/Release/
+**/x64/Debug/
+**/x64/Release/
+**/build/
+**/out/
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.exp
+
+# Object files
+*.obj
+*.o
+*.lo
+*.a
+*.la
+
+# CUDA intermediate files
+*.cache
+*.cu.d
+*.pdb
+*.idb
+*.tlog
+*.ipdb
+*.iobj
+
+# Generated logs
+*.log
+
+# CMake (如果你未来用到)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile

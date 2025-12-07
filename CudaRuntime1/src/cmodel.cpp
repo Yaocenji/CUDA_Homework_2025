@@ -34,6 +34,8 @@
 #include <mutex>
 #include <iostream>
 
+#include "../checkCuda.h"
+
 using namespace std;
 
 // mutex to lock critical region
@@ -481,6 +483,10 @@ REAL check(kmesh* m1, kmesh* m2, const transf& trfA, const transf& trfB, std::ve
 	return	m1->distNaive(m2, trfA2B, pairs);
 }
 
+REAL checkCuda(kmesh* m1, kmesh* m2, std::vector<id_pair>& pairs) {
+	return checkDistCuda(m1, m2, g_scene.cdPairs);
+}
+
 void checkDistance(int mode)
 {
 	// std::cout << "Dist Mode: " << mode << std::endl;
@@ -496,7 +502,14 @@ void checkDistance(int mode)
 	kmesh* m1 = bodyA->getMesh();
 	kmesh* m2 = bodyB->getMesh();
 	tstart = omp_get_wtime();
-	float dist = check(m1, m2, trfA, trfB, g_scene.cdPairs);
+
+	
+	float dist = 0;
+	if (mode == 2)
+		dist = checkCuda(m1, m2, g_scene.cdPairs);
+	else
+		dist = check(m1, m2, trfA, trfB, g_scene.cdPairs);
+
 	tdelta = omp_get_wtime() - tstart;
 
 	printf("MinDistance = %f (%zd pairs) at %2.5f s\n", sqrt(dist), g_scene.cdPairs.size(), tdelta);
