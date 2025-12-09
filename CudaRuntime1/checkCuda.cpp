@@ -324,27 +324,33 @@ int nextPowerOf2(int n) {
 	return n + 1;
 }
 
-
-
-// CUDA 核函数：填充点集的 padding 部分，包括morton code和obj idx
-__global__ void set_padding_data(unsigned long long* morton_codes, int* object_ids,
-	int num_points, int padded_num) {
-	int idx = blockIdx.x * blockDim.x + threadIdx.x + num_points;
-	if (idx < padded_num) {
-		morton_codes[idx] = 0xFFFFFFFFFFFFFFFFULL; // ULLONG_MAX
-		object_ids[idx] = -1; // 或者 INT_MAX，表示无效ID
+// CUDA 核函数：填充点集的 obj idx padding 部分
+__global__ void set_padding_obj_index(int* object_ids, int num_points, int padded_num_points) {
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	int stride = blockDim.x * gridDim.x;
+	if (idx >= padded_num_points) return;
+	for (int i = idx; i < num_points; i += stride) {
+		if (i >= num_points && i < padded_num_points)
+			object_ids[i] = INT_MAX;
 	}
 }
 
 // 填充点集的 obj idx padding 的主机函数
-void set_padding_cuda(unsigned long long* morton_codes, int* object_ids, int num_points, int padded_num_points) {
+void set_padding_obj_index_cuda(int* object_ids, int num_points, int padded_num_points) {
 
 	// 配置参数
 	const int blockSize = 256;
-	int gridSize = (padded_num_points + blockSize - 1) / blockSize;
+	int numSMs;
+	int devId = 0;
+	cudaGetDevice(&devId);
+	cudaDeviceGetAttribute(&numSMs, cudaDevAttrMultiProcessorCount, devId);
+	int optimalGridSize = numSMs * 4;
+	int neededBlocks = (num_points + blockSize - 1) / blockSize;
+	// 取二者较小值
+	int gridSize = std::min(optimalGridSize, neededBlocks);
 
-	set_padding_data <<<gridSize, blockSize>>>(
-		morton_codes, object_ids, num_points, padded_num_points
+	set_padding_obj_index<<<gridSize, blockSize>>>(
+		object_ids, num_points, padded_num_points
 	);
 
 	cudaDeviceSynchronize();
@@ -485,20 +491,16 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		CUDA_CHECK_ERROR(err);
 		err = cudaMalloc((void**)&aabbCuda2, 2 * sizeof(vec3f));
 		CUDA_CHECK_ERROR(err);
-
-		// 莫顿码和索引内存分配，都要padding到2的幂次，以便排序
-		// 计算填充后的大小
-		int padded_num1 = nextPowerOf2(pointNumber1);
-		int padded_num2 = nextPowerOf2(pointNumber2);
 		// 莫顿码内存分配
-		err = cudaMalloc((void**)&mortonCodes1Cuda, padded_num1 * sizeof(unsigned long long));
+		err = cudaMalloc((void**)&mortonCodes1Cuda, pointNumber1 * sizeof(unsigned long long));
 		CUDA_CHECK_ERROR(err);
-		err = cudaMalloc((void**)&mortonCodes2Cuda, padded_num2 * sizeof(unsigned long long));
+		err = cudaMalloc((void**)&mortonCodes2Cuda, pointNumber2 * sizeof(unsigned long long));
 		CUDA_CHECK_ERROR(err);
 		// 索引内存分配
-		err = cudaMalloc((void**)&ObjectIDx1Cuda, padded_num1 * sizeof(int));
+		// 注意：这里分配的大小是下一个2的幂，以便后续排序算法使用
+		err = cudaMalloc((void**)&ObjectIDx1Cuda, pointNumber1 * sizeof(int));
 		CUDA_CHECK_ERROR(err);
-		err = cudaMalloc((void**)&ObjectIDx2Cuda, padded_num2 * sizeof(int));
+		err = cudaMalloc((void**)&ObjectIDx2Cuda, pointNumber2 * sizeof(int));
 		CUDA_CHECK_ERROR(err);
 	}
 
@@ -548,14 +550,8 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		cudaMemcpy(aabbCpu2, aabbCuda2, 2 * sizeof(vec3f), cudaMemcpyDeviceToHost);
 
 		// test expand函数
-		/*unsigned int testUnexpanded = 2097151;
-		auto testExpanded = expandBits(testUnexpanded);*/
-
-		// 在计算morton code前，先对padding部分进行设置
-		int padded_num1 = nextPowerOf2(pointNumber1);
-		int padded_num2 = nextPowerOf2(pointNumber2);
-		set_padding_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, pointNumber1, padded_num1);
-		set_padding_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, pointNumber2, padded_num2);
+		unsigned int testUnexpanded = 2097151;
+		auto testExpanded = expandBits(testUnexpanded);
 
 		// 计算morton code
 		compute_morton_codes_cuda(points1Cuda, pointNumber1,
@@ -567,24 +563,16 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 			mortonCodes2Cuda,
 			ObjectIDx2Cuda);
 
+		// 排序morton code和对应的index
+		/*bitonic_sort_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, nextPowerOf2(pointNumber1));
+		bitonic_sort_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, nextPowerOf2(pointNumber2));*/
 
 		// debug：将morton code从设备复制回主机（全部）
 		vector<unsigned long long> mc1cuda;
-		mc1cuda.resize(padded_num1);
-		cudaMemcpy(mc1cuda.data(), mortonCodes1Cuda, padded_num1 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-		vector<int> idx1cuda;
-		idx1cuda.resize(padded_num1);
-		cudaMemcpy(idx1cuda.data(), ObjectIDx1Cuda, padded_num1 * sizeof(int), cudaMemcpyDeviceToHost);
-
-		// 排序morton code和对应的index
-		bitonic_sort_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, nextPowerOf2(pointNumber1));
-		bitonic_sort_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, nextPowerOf2(pointNumber2));
-
-		// debug：将morton code从设备复制回主机（全部）
-		cudaMemcpy(mc1cuda.data(), mortonCodes1Cuda, pointNumber1 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
-		cudaMemcpy(idx1cuda.data(), ObjectIDx1Cuda, padded_num1 * sizeof(int), cudaMemcpyDeviceToHost);
-
-		
+		mc1cuda.resize(pointNumber1);
+		cudaMemcpy(mc1cuda.data(), mortonCodes1Cuda, pointNumber1, cudaMemcpyDeviceToHost);
+		unsigned long long mc1cpu = morton3D(m1->_vtxs[0].x, m1->_vtxs[0].y, m1->_vtxs[0].z,
+			aabbCpu1[0], aabbCpu1[1] - aabbCpu1[0]);
 
 		rets.clear();
 		rets.push_back(id_pair(0, 0, false));
