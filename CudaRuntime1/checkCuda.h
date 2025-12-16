@@ -19,22 +19,23 @@
 // 检测模式
 enum CheckMode{
     CHECK_MODE_BRUTE_FORCE = 0,
-    CHECK_MODE_BVH = 1
+    CHECK_MODE_BVH = 1,
+    CHECK_MODE_TEST = 2
 };
 
 // BVH数据结构
-struct BVHNode {
-    // 包围盒
-    vec3f bboxMin;
-    vec3f bboxMax;
+struct LBVHNode {
+    // 包围盒 (使用 double)
+    vec3f min_box;
+    vec3f max_box;
 
-    // 子节点索引（-1 表示叶子）
-    int left;
-    int right;
+    // 拓扑关系
+    int left_child;  // 索引
+    int right_child; // 索引
+    int parent;      // 索引
 
-    // 叶子节点包含的点索引范围
-    int start;   // points[start]
-    int count;   // 叶子包含点的数量
+    // 用于自底向上 Refit 的原子计数器
+    int atom_flag;
 };
 
 /// <summary>
@@ -66,4 +67,4 @@ void compute_global_aabb_double_cpu(vec3f* points, int num_points, vec3f* fmin, 
 /// <returns></returns>
 __global__ void BruteForce_CalculateDistance(vec3f* points1, vec3f* points2, double* distData, size_t pointNumber1, size_t pointNumber2);
 
-REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets, CheckMode mode);
+REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets, CheckMode mode, bool stepTimeRecord);

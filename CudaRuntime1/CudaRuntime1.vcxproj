@@ -89,9 +89,10 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;WIN64;NON_PROF;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN64;PROF;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>Default</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -126,9 +127,10 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;WIN64;NON_PROF;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN64;PROF;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>E:\Microsoft Visual Studio Projects\CudaHomework01\CudaRuntime1\inc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>Default</LanguageStandard>
+      <ConformanceMode>false</ConformanceMode>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -164,8 +166,15 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="checkCuda.cu" />
+    <CudaCompile Include="checkCuda.cu">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">--std c++17 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">--std c++17 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
     <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="ThrustWrapper.cu">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">--std c++17 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">--std c++17 %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="checkCuda.h" />

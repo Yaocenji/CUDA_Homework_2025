@@ -484,7 +484,11 @@ REAL check(kmesh* m1, kmesh* m2, const transf& trfA, const transf& trfB, std::ve
 }
 
 REAL checkCuda(kmesh* m1, kmesh* m2, std::vector<id_pair>& pairs) {
-	return checkDistCuda(m1, m2, g_scene.cdPairs, CHECK_MODE_BVH);
+#ifdef PROF
+	return checkDistCuda(m1, m2, g_scene.cdPairs, CHECK_MODE_BVH, false);
+#else 
+	return checkDistCuda(m1, m2, g_scene.cdPairs, CHECK_MODE_BVH, true);
+#endif
 }
 
 void checkDistance(int mode)
