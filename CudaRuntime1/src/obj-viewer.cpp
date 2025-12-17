@@ -468,6 +468,9 @@ int main(int argc, char** argv) {
 
 	initModel(argv[1], argv[2]);
 
+	// debug
+	checkType = 2;
+
 	totalQuery = 0;
 	verb = false;
 	int steps = 20;

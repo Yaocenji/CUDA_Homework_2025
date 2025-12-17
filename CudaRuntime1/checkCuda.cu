@@ -8,6 +8,9 @@ extern "C" void perform_thrust_sort(unsigned long long* d_keys, int* d_values, i
 // Thrust 查询最小值函数声明
 extern "C" void perform_thrust_min_element(double* d_data, int num_points, double* out_min_val, int* out_idx);
 
+// Thrust 计算全局包围盒
+extern "C" void perform_thrust_aabb(double* d_points, int num_points, double* out_min, double* out_max);
+
 // 实现 double 类型的 atomicMin
 __device__ __forceinline__ double atomicMinDouble(double* address, double val) {
 	unsigned long long int* address_as_ull = (unsigned long long int*)address;
@@ -70,7 +73,7 @@ __global__ void BruteForce_CalculateDistance(vec3f* points1, vec3f* points2, dou
 
 
 // 计算点集的 AABB (双精度版本)
-__global__ void compute_aabb_kernel_double(const vec3f* points, int num_points, vec3f* global_min, vec3f* global_max) {
+__global__ void compute_aabb_kernel_double(const vec3f* __restrict__ points, int num_points, vec3f* global_min, vec3f* global_max) {
 	// 1. 线程局部变量初始化 (使用 DBL_MAX)
 	vec3f local_min = { DBL_MAX, DBL_MAX, DBL_MAX };
 	vec3f local_max = { -DBL_MAX, -DBL_MAX, -DBL_MAX };
@@ -263,7 +266,7 @@ __device__ __host__ __forceinline__ unsigned long long morton3D(double x, double
 }
 
 // 计算点集的 Morton Code 的 CUDA 核函数
-__global__ void compute_morton_codes_kernel(const vec3f* points, int num_points,
+__global__ void compute_morton_codes_kernel(const vec3f* __restrict__ points, int num_points,
 	vec3f* min_box, vec3f* max_box,
 	unsigned long long* morton_codes,
 	int* object_ids) {
@@ -479,8 +482,8 @@ void initialize_bvh_nodes(LBVHNode* bvh_nodes, int bvh_number) {
 /// <param name="num_points"></param>
 /// <returns></returns>
 __global__ void generate_hierarchy_kernel(
-	const unsigned long long* sorted_morton_codes,
-	const int* sorted_object_ids, // 这里虽然暂时没用到，但后续 Refit 可能需要知道叶子对应的原始对象
+	const unsigned long long* __restrict__ sorted_morton_codes,
+	const int* __restrict__ sorted_object_ids, // 这里虽然暂时没用到，但后续 Refit 可能需要知道叶子对应的原始对象
 	LBVHNode* leaf_nodes,         // 长度 N
 	LBVHNode* internal_nodes,     // 长度 N - 1
 	int num_points) {
@@ -751,8 +754,8 @@ bool verify_lbvh_structure(const std::vector<LBVHNode>& nodes, int num_points) {
 
 
 // 辅助函数：合并两个 AABB
-__device__ __forceinline__ void aabb_union(const vec3f& min_a, const vec3f& max_a,
-	const vec3f& min_b, const vec3f& max_b,
+__device__ __forceinline__ void aabb_union(const vec3f& __restrict__ min_a, const vec3f& __restrict__ max_a,
+	const vec3f& __restrict__ min_b, const vec3f& __restrict__ max_b,
 	vec3f& res_min, vec3f& res_max) {
 	res_min.x = fmin(min_a.x, min_b.x);
 	res_min.y = fmin(min_a.y, min_b.y);
@@ -764,8 +767,8 @@ __device__ __forceinline__ void aabb_union(const vec3f& min_a, const vec3f& max_
 }
 
 __global__ void refit_lbvh_kernel(
-	const int* sorted_object_ids,
-	const vec3f* points,
+	const int* __restrict__ sorted_object_ids,
+	const vec3f* __restrict__ points,
 	LBVHNode* leaf_nodes,      // 长度 N
 	LBVHNode* internal_nodes,  // 长度 N-1
 	int num_points) {
@@ -1017,11 +1020,10 @@ __device__ __forceinline__ double dist_sq_point_aabb(const vec3f& p, const vec3f
 
 // 最后的函数：查询距离
 __global__ void query_distance_kernel(
-	const vec3f* query_points,    // 点云 A (查询发起者)
+	const vec3f* __restrict__ query_points,    // 点云 A (查询发起者)
 	int num_query_points,
-	const LBVHNode* bvh_nodes,    // 点云 B 的 BVH 数组
-	const int* sorted_obj_ids_b,  // 点云 B 的排序索引 (用于从 points_b 获取坐标)
-	const vec3f* points_b_raw,    // 点云 B 的原始坐标数据
+	const LBVHNode* __restrict__ bvh_nodes,    // 点云 B 的 BVH 数组
+	const int* __restrict__ sorted_obj_ids_b,  // 点云 B 的排序索引 (用于从 points_b 获取坐标)
 	int* root_node_idx,           // 点云 B 的根节点索引
 	int num_bvh_points,           // 点云 B 的点数 (用于判断 is_leaf)
 	double* out_min_dists,        // 输出：每个查询点的最近距离
@@ -1076,6 +1078,102 @@ __global__ void query_distance_kernel(
 }
 
 
+// 优化版
+__global__ void query_distance_kernel_optimized(
+	const vec3f* __restrict__ query_points,
+	int num_query_points,
+	const LBVHNode* __restrict__ bvh_nodes,
+	const int* __restrict__ sorted_obj_ids_b,
+	int* root_node_idx,
+	int num_bvh_points,
+	double* out_min_dists,
+	int* out_min_indices) {
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= num_query_points) return;
+
+	vec3f q = query_points[idx];
+	double current_min_sq = DBL_MAX;
+	int current_best_idx = -1;
+
+	// 栈深度 64，足够深
+	int stack[64];
+	int stack_ptr = 0;
+
+	// 只有当根节点有可能比 DBL_MAX 小时才放入 (虽然肯定是 true，但保持逻辑一致)
+	stack[stack_ptr++] = *root_node_idx;
+
+	while (stack_ptr > 0) {
+		int node_idx = stack[--stack_ptr];
+
+		// 优化：使用 __ldg() 显式告诉 GPU 通过只读缓存 (Read-Only Cache) 读取
+		// 这对随机访问的 BVH 遍历提速明显
+		LBVHNode node = (bvh_nodes[node_idx]);
+
+		// 1. AABB 剔除 (Double Check)
+		// 虽然入栈前检查过，但 current_min_sq 可能在处理兄弟节点时变小了
+		// 所以出栈时再次检查是必要的
+		double box_dist_sq = dist_sq_point_aabb(q, node.min_box, node.max_box);
+		if (box_dist_sq >= current_min_sq) continue;
+
+		// 2. 叶子节点处理
+		if (node_idx < num_bvh_points) {
+			// 直接计算点距离
+			double leaf_dist_sq = dist_sq_point_point(q, node.min_box);
+			if (leaf_dist_sq < current_min_sq) {
+				current_min_sq = leaf_dist_sq;
+				current_best_idx = (sorted_obj_ids_b[node_idx]);
+			}
+		}
+		// 3. 内部节点处理
+		else {
+			int left_idx = node.left_child;
+			int right_idx = node.right_child;
+
+			double dist_l = DBL_MAX;
+			double dist_r = DBL_MAX;
+			bool traverse_l = false;
+			bool traverse_r = false;
+
+			// 预读取并计算距离 (这里产生了 Global Memory Read，所以必须物尽其用)
+			if (left_idx != -1) {
+				LBVHNode l_node = (bvh_nodes[left_idx]);
+				dist_l = dist_sq_point_aabb(q, l_node.min_box, l_node.max_box);
+				// 【建议2 采纳】：入栈前剔除
+				if (dist_l < current_min_sq) traverse_l = true;
+			}
+
+			if (right_idx != -1) {
+				LBVHNode r_node = (bvh_nodes[right_idx]);
+				dist_r = dist_sq_point_aabb(q, r_node.min_box, r_node.max_box);
+				// 【建议2 采纳】：入栈前剔除
+				if (dist_r < current_min_sq) traverse_r = true;
+			}
+
+			// 启发式入栈：先处理近的，后处理远的 -> 远的先入栈，近的后入栈
+			if (traverse_l && traverse_r) {
+				if (dist_l < dist_r) {
+					stack[stack_ptr++] = right_idx; // 远
+					stack[stack_ptr++] = left_idx;  // 近
+				}
+				else {
+					stack[stack_ptr++] = left_idx;  // 远
+					stack[stack_ptr++] = right_idx; // 近
+				}
+			}
+			else if (traverse_l) {
+				stack[stack_ptr++] = left_idx;
+			}
+			else if (traverse_r) {
+				stack[stack_ptr++] = right_idx;
+			}
+		}
+	}
+
+	out_min_dists[idx] = sqrt(current_min_sq);
+	out_min_indices[idx] = current_best_idx;
+}
+
+
 
 REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets, CheckMode mode, bool stepTimeRecord) {
 	// 报错信息
@@ -1109,20 +1207,21 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 	// 计算结果：距离矩阵
 	double* distDataCuda = nullptr;
 
+	// 实际上，单树遍历法只需要点集2的BVH
 	// AABB包围盒
-	vec3f* aabbCuda1 = nullptr;
+	//vec3f* aabbCuda1 = nullptr;
 	vec3f* aabbCuda2 = nullptr;
 
 	// morton code
-	unsigned long long* mortonCodes1Cuda = nullptr;
+	//unsigned long long* mortonCodes1Cuda = nullptr;
 	unsigned long long* mortonCodes2Cuda = nullptr;
 
 	// 用于mortoncode的排序索引
-	int * ObjectIDx1Cuda = nullptr;
+	//int * ObjectIDx1Cuda = nullptr;
 	int* ObjectIDx2Cuda = nullptr;
 
 	// LBVH节点
-	LBVHNode* BVHNodes1Cuda = nullptr;
+	//LBVHNode* BVHNodes1Cuda = nullptr;
 	LBVHNode* BVHNodes2Cuda = nullptr;
 	// 根节点信息
 	int* LBVHRootDataCuda = nullptr;
@@ -1157,29 +1256,26 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 	if (mode == CHECK_MODE_BVH || mode == CHECK_MODE_TEST) {
 		// BVH模式下的内存分配
 		// AABB内存分配
-		err = cudaMalloc((void**)&aabbCuda1, 2 * sizeof(vec3f));
-		CUDA_CHECK_ERROR(err);
+		/*err = cudaMalloc((void**)&aabbCuda1, 2 * sizeof(vec3f));
+		CUDA_CHECK_ERROR(err);*/
 		err = cudaMalloc((void**)&aabbCuda2, 2 * sizeof(vec3f));
 		CUDA_CHECK_ERROR(err);
 
-		// 莫顿码和索引内存分配，都要padding到2的幂次，以便排序
-		// 计算填充后的大小
-		int padded_num1 = nextPowerOf2(pointNumber1);
-		int padded_num2 = nextPowerOf2(pointNumber2);
+		// 莫顿码和索引内存分配
 		// 莫顿码内存分配
-		err = cudaMalloc((void**)&mortonCodes1Cuda, padded_num1 * sizeof(unsigned long long));
-		CUDA_CHECK_ERROR(err);
-		err = cudaMalloc((void**)&mortonCodes2Cuda, padded_num2 * sizeof(unsigned long long));
+		/*err = cudaMalloc((void**)&mortonCodes1Cuda, pointNumber1 * sizeof(unsigned long long));
+		CUDA_CHECK_ERROR(err);*/
+		err = cudaMalloc((void**)&mortonCodes2Cuda, pointNumber2 * sizeof(unsigned long long));
 		CUDA_CHECK_ERROR(err);
 		// 索引内存分配
-		err = cudaMalloc((void**)&ObjectIDx1Cuda, padded_num1 * sizeof(int));
-		CUDA_CHECK_ERROR(err);
-		err = cudaMalloc((void**)&ObjectIDx2Cuda, padded_num2 * sizeof(int));
+		/*err = cudaMalloc((void**)&ObjectIDx1Cuda, pointNumber1 * sizeof(int));
+		CUDA_CHECK_ERROR(err);*/
+		err = cudaMalloc((void**)&ObjectIDx2Cuda, pointNumber2 * sizeof(int));
 		CUDA_CHECK_ERROR(err);
 
 		// LBVH节点内存分配
-		err = cudaMalloc((void**)&BVHNodes1Cuda, (pointNumber1 * 2 - 1) * sizeof(LBVHNode));
-		CUDA_CHECK_ERROR(err);
+		/*err = cudaMalloc((void**)&BVHNodes1Cuda, (pointNumber1 * 2 - 1) * sizeof(LBVHNode));
+		CUDA_CHECK_ERROR(err);*/
 
 		err = cudaMalloc((void**)&BVHNodes2Cuda, (pointNumber2 * 2 - 1) * sizeof(LBVHNode));
 		CUDA_CHECK_ERROR(err);
@@ -1243,8 +1339,10 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 	}
 	if (mode == CHECK_MODE_BVH || mode == CHECK_MODE_TEST) {
 		// BVH模式下的距离计算
-		compute_global_aabb_double_cuda(points1Cuda, pointNumber1, aabbCuda1, aabbCuda1 + 1);
-		compute_global_aabb_double_cuda(points2Cuda, pointNumber2, aabbCuda2, aabbCuda2 + 1);
+		//compute_global_aabb_double_cuda(points1Cuda, pointNumber1, aabbCuda1, aabbCuda1 + 1);
+		//compute_global_aabb_double_cuda(points2Cuda, pointNumber2, aabbCuda2, aabbCuda2 + 1);
+
+		perform_thrust_aabb((double*)points2Cuda, pointNumber2, (double*)(aabbCuda2), (double*)(aabbCuda2 + 1));
 
 		// debug: 将AABB从设备复制回主机
 		//vec3f aabbCpu1[2];
@@ -1253,16 +1351,14 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		//cudaMemcpy(aabbCpu2, aabbCuda2, 2 * sizeof(vec3f), cudaMemcpyDeviceToHost);
 
 		// 在计算morton code前，先对padding部分进行设置
-		int padded_num1 = nextPowerOf2(pointNumber1);
-		int padded_num2 = nextPowerOf2(pointNumber2);
-		set_padding_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, pointNumber1, padded_num1);
-		set_padding_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, pointNumber2, padded_num2);
+		//set_padding_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, pointNumber1, pointNumber1);
+		set_padding_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, pointNumber2, pointNumber2);
 
 		// 计算morton code
-		compute_morton_codes_cuda(points1Cuda, pointNumber1,
+		/*compute_morton_codes_cuda(points1Cuda, pointNumber1,
 			&(aabbCuda1[0]), &(aabbCuda1[1]),
 			mortonCodes1Cuda,
-			ObjectIDx1Cuda);
+			ObjectIDx1Cuda);*/
 		compute_morton_codes_cuda(points2Cuda, pointNumber2,
 			&(aabbCuda2[0]), &(aabbCuda2[1]),
 			mortonCodes2Cuda,
@@ -1271,22 +1367,22 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 
 		// debug：将morton code从设备复制回主机（全部）
 		//vector<unsigned long long> mc1cuda;
-		//mc1cuda.resize(padded_num1);
-		//cudaMemcpy(mc1cuda.data(), mortonCodes1Cuda, padded_num1 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+		//mc1cuda.resize(pointNumber1);
+		//cudaMemcpy(mc1cuda.data(), mortonCodes1Cuda, pointNumber1 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
 		//vector<int> idx1cuda;
-		//idx1cuda.resize(padded_num1);
-		//cudaMemcpy(idx1cuda.data(), ObjectIDx1Cuda, padded_num1 * sizeof(int), cudaMemcpyDeviceToHost);
+		//idx1cuda.resize(pointNumber1);
+		//cudaMemcpy(idx1cuda.data(), ObjectIDx1Cuda, pointNumber1 * sizeof(int), cudaMemcpyDeviceToHost);
 
 		//vector<unsigned long long> mc2cuda;
-		//mc2cuda.resize(padded_num2);
-		//cudaMemcpy(mc2cuda.data(), mortonCodes2Cuda, padded_num2 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+		//mc2cuda.resize(pointNumber2);
+		//cudaMemcpy(mc2cuda.data(), mortonCodes2Cuda, pointNumber2 * sizeof(unsigned long long), cudaMemcpyDeviceToHost);
 
 		// 排序morton code和对应的index
 		/*bitonic_sort_cuda(mortonCodes1Cuda, ObjectIDx1Cuda, nextPowerOf2(pointNumber1));
 		bitonic_sort_cuda(mortonCodes2Cuda, ObjectIDx2Cuda, nextPowerOf2(pointNumber2));*/
 		// 这部分总是有问题，放弃，直接当调包侠，使用thrust
-		perform_thrust_sort(mortonCodes1Cuda, ObjectIDx1Cuda, padded_num1);
-		perform_thrust_sort(mortonCodes2Cuda, ObjectIDx2Cuda, padded_num2);
+		//perform_thrust_sort(mortonCodes1Cuda, ObjectIDx1Cuda, pointNumber1);
+		perform_thrust_sort(mortonCodes2Cuda, ObjectIDx2Cuda, pointNumber2);
 
 
 		// debug：将morton code从设备复制回主机（全部）
@@ -1343,16 +1439,16 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		//}
 		
 		// 初始化BVH节点
-		initialize_bvh_nodes(BVHNodes1Cuda, pointNumber1 * 2 - 1);
+		//initialize_bvh_nodes(BVHNodes1Cuda, pointNumber1 * 2 - 1);
 		initialize_bvh_nodes(BVHNodes2Cuda, pointNumber2 * 2 - 1);
 
 		// 生成LBVH树
-		build_lbvh_structure_cuda(
+		/*build_lbvh_structure_cuda(
 			mortonCodes1Cuda,
 			ObjectIDx1Cuda,
 			BVHNodes1Cuda,
 			BVHNodes1Cuda + pointNumber1,
-			pointNumber1);
+			pointNumber1);*/
 		build_lbvh_structure_cuda(
 			mortonCodes2Cuda,
 			ObjectIDx2Cuda,
@@ -1370,7 +1466,7 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		//cudaMemcpy(bvh2cpu.data(), BVHNodes2Cuda, (pointNumber2 * 2 - 1) * sizeof(LBVHNode), cudaMemcpyDeviceToHost);
 
 		// 动态查找根节点
-		find_root(BVHNodes1Cuda + pointNumber1, pointNumber1, LBVHRootDataCuda, LBVHRootDataCuda + 1);
+		//find_root(BVHNodes1Cuda + pointNumber1, pointNumber1, LBVHRootDataCuda, LBVHRootDataCuda + 1);
 		find_root(BVHNodes2Cuda + pointNumber2, pointNumber2, LBVHRootDataCuda + 2, LBVHRootDataCuda + 3);
 
 		// debug 将根节点数据从设备复制回主机
@@ -1378,12 +1474,12 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		//cudaMemcpy(&rootDataHost, LBVHRootDataCuda, 4 * sizeof(int), cudaMemcpyDeviceToHost);
 
 		// 自底向上，构建BVH每个节点的AABB
-		refit_lbvh_structure_cuda(
+		/*refit_lbvh_structure_cuda(
 			ObjectIDx1Cuda,
 			points1Cuda,
 			BVHNodes1Cuda,
 			BVHNodes1Cuda + pointNumber1,
-			pointNumber1);
+			pointNumber1);*/
 		refit_lbvh_structure_cuda(
 			ObjectIDx2Cuda,
 			points2Cuda,
@@ -1423,12 +1519,11 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		int threads = 256;
 		int blocks = (pointNumber1 + threads - 1) / threads;
 
-		query_distance_kernel << <blocks, threads >> > (
+		query_distance_kernel_optimized << <blocks, threads >> > (
 			points1Cuda,         // 查询点 (Tree 1 的原始点)
 			pointNumber1,
 			BVHNodes2Cuda,       // 目标树 (Tree 2)
 			ObjectIDx2Cuda,      // Tree 2 的排序索引
-			points2Cuda,         // Tree 2 的原始点 (备用)
 			LBVHRootDataCuda + 2,// Tree 2 的根的索引
 			pointNumber2,        // Tree 2 的叶子数
 			d_min_dists,         // 输出
@@ -1470,8 +1565,8 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		rets.push_back(id_pair(idx1_BVH, idx2_BVH, false));
 		// 输出对比信息
 		std::cout << "\n=== CHECK MODE: BRUTE FORCE VS BVH ===\n";
-		std::cout << "Brute Force Result: Cloud1[" << idx1_BF << "] <-> Cloud2[" << idx2_BF << "], Distance = " << minDist_BF << "\n";
-		std::cout << "BVH Result        : Cloud1[" << idx1_BVH << "] <-> Cloud2[" << idx2_BVH << "], Distance = " << minDist_BVH << "\n";
+		std::cout << "Brute Force Result: Cloud1[" << idx1_BF << "] <-> Cloud2[" << idx2_BF << "]" << "\n";
+		std::cout << "BVH Result        : Cloud1[" << idx1_BVH << "] <-> Cloud2[" << idx2_BVH << "]" << "\n";
 		if (idx1_BF == idx1_BVH && idx2_BF == idx2_BVH) {
 			std::cout << ">>> CHECK PASSED: Both methods found the SAME closest pair. <<<\n\n";
 		}
@@ -1495,15 +1590,15 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 		free(distDataHost);
 	}
 	if (mode == CHECK_MODE_BVH || mode == CHECK_MODE_TEST) {
-		cudaFree(aabbCuda1);
+		//cudaFree(aabbCuda1);
 		cudaFree(aabbCuda2);  
 
-		cudaFree(mortonCodes1Cuda);
+		//cudaFree(mortonCodes1Cuda);
 		cudaFree(mortonCodes2Cuda);
-		cudaFree(ObjectIDx1Cuda);
+		//cudaFree(ObjectIDx1Cuda);
 		cudaFree(ObjectIDx2Cuda);
 
-		cudaFree(BVHNodes1Cuda);
+		//cudaFree(BVHNodes1Cuda);
 		cudaFree(BVHNodes2Cuda);
 		cudaFree(LBVHRootDataCuda);
 
@@ -1525,5 +1620,5 @@ REAL checkDistCuda(const kmesh* m1, const kmesh* m2, std::vector<id_pair>& rets,
 	std::cout << "\nTotal CUDA Time: " << (all_stop_time_cpu - all_start_time_cpu) * 1000.0 << " ms\n\n";
 #endif
 
-	return minDist_BF;
+	return 0;
 }

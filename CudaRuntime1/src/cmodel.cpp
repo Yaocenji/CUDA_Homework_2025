@@ -484,6 +484,14 @@ REAL check(kmesh* m1, kmesh* m2, const transf& trfA, const transf& trfB, std::ve
 }
 
 REAL checkCuda(kmesh* m1, kmesh* m2, std::vector<id_pair>& pairs) {
+	kmesh* realM1 = nullptr; 
+	kmesh* realM2 = nullptr;
+	if (m1->_num_vtx <= m2->_num_vtx) {
+		realM1 = m1; realM2 = m2;
+	}
+	else {
+		realM1 = m2; realM2 = m1;
+	}
 #ifdef PROF
 	return checkDistCuda(m1, m2, g_scene.cdPairs, CHECK_MODE_BVH, false);
 #else 
